@@ -27,7 +27,7 @@ class OssUpload
      */
     public function up(array $files): void
     {
-        $fileSystem = make(\Hyperf\Filesystem\FilesystemFactory::class)->get('oss');
+        $fileSystem = make(\League\Flysystem\Filesystem::class);
 
         foreach ($files as $paths) {
             if (count($paths) < 2) {
@@ -41,13 +41,14 @@ class OssUpload
 
             ## url资源
             if (strpos($localPath, 'http') === 0) {
-                $fileSystem->write($ossPath, file_get_contents($localPath));
+                $ctx = stream_context_create([
+                    'http' => [
+                        'timeout' => 180,
+                    ],
+                ]);
+                $fileSystem->write($ossPath, file_get_contents($localPath, false, $ctx));
             } else {
-                if (filesize($localPath) >= 10 * 1024 * 1024) {
-                    $fileSystem->getAdapter()->multipartUpload($localPath, $ossPath);
-                } else {
-                    $fileSystem->writeStream($ossPath, fopen($localPath, 'rb'));
-                }
+                $fileSystem->writeStream($ossPath, fopen($localPath, 'rb'));
                 $isUnlink && file_exists($localPath) && unlink($localPath);
             }
         }
